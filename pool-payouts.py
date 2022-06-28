@@ -58,9 +58,11 @@ async def run_client(host, port, private_key):
         scheme="ws", host=host, port=port
     ) as client:
         try:
-            # Get consensus
-            consensus = await client.consensus()
-            logging.info("Consensus: {0}".format(consensus))
+            consensus = False
+            while not consensus:
+                # Get consensus
+                consensus = await client.consensus()
+                logging.info("Consensus: {0}".format(consensus))
         except InternalErrorException as error:
             logging.critical(
                 "Got error when trying to connect to the RPC server: {0}"
