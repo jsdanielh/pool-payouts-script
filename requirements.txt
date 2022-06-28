@@ -1,4 +1,2 @@
 argparse
-jsonrpcclient
-git+https://github.com/jsdanielh/python-client.git@b24ff47#egg=nimiqclient
-websockets
+git+https://github.com/jsdanielh/python-client.git@9a1a9bd#egg=nimiqclient
