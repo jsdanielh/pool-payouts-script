@@ -44,8 +44,8 @@ async def process_block(client, hash):
             if sender != recipient:
                 logging.info("Sending reward of {} to address {}".format(
                     amount_to_send, recipient))
-                await client.send_basic_transaction(
-                    sender, recipient, amount_to_send, 0, block.number)
+                await client.send_stake_transaction(
+                    sender, recipient, amount_to_send, 0, str(block.number))
         else:
             raise InternalErrorException(
                 "Can't send transaction because {0} is locked".format(
