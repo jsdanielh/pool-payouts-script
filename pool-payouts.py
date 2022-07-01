@@ -6,8 +6,6 @@ from nimiqclient import *
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 DEFAULT_LOG_LEVEL = "INFO"
 
-pool_fee = 0
-
 
 class Range(object):
     def __init__(self, start, end):
@@ -18,42 +16,46 @@ class Range(object):
         return self.start <= other <= self.end
 
 
-async def process_block(client, hash):
-    logging.debug("Block hash: {}".format(hash))
-    block = await client.get_block_by_hash(hash, False)
-    # Nothing to do when the block is a micro block
-    if block.type == "micro":
+async def process_logs(client, log, kwargs):
+    logging.debug("Received log of type: {}".format(log.type))
+    if log.type != "applied-block":
         return
-    logging.info("Running for block {}".format(block.number))
-    validator_address = await client.get_validator_address()
-    validator = await client.get_validator_by_address(
-        validator_address, include_stakers=True)
-    reward_account = await client.get_account_by_address(
-        validator.rewardAddress)
-    total_staked_balance = 0
 
-    for staker in validator.stakers:
-        total_staked_balance += staker.balance
-    for staker in validator.stakers:
-        amount_to_send = int(
-            float(staker.balance)/float(total_staked_balance) *
-            float(reward_account.balance) * (1.0 - pool_fee))
-        sender = reward_account.address
-        recipient = staker.address
-        if await client.is_account_unlocked(reward_account.address):
-            if sender != recipient:
-                logging.info("Sending reward of {} to address {}".format(
-                    amount_to_send, recipient))
-                await client.send_stake_transaction(
-                    sender, recipient, amount_to_send, 0, str(block.number))
-        else:
-            raise InternalErrorException(
-                "Can't send transaction because {0} is locked".format(
-                    reward_account.address)
-            )
+    # The obtained log is of type BlockLog, we have to iterate its inherents
+    for inherent in log.inherentLogs:
+        if inherent.type != "payout-reward":
+            continue
+
+        logging.info("Running for block {}".format(log.blockNumber))
+        validator_address = await client.get_validator_address()
+        validator = await client.get_validator_by_address(
+            validator_address, include_stakers=True)
+        reward_account = await client.get_account_by_address(
+            validator.rewardAddress)
+        total_staked_balance = 0
+
+        for staker in validator.stakers:
+            total_staked_balance += staker.balance
+        for staker in validator.stakers:
+            amount_to_send = int(
+                float(staker.balance)/float(total_staked_balance) *
+                float(inherent.value) * (1.0 - kwargs['pool_fee']))
+            sender = reward_account.address
+            recipient = staker.address
+            if await client.is_account_unlocked(reward_account.address):
+                if sender != recipient:
+                    logging.info("Sending reward of {} to address {}".format(
+                        amount_to_send, recipient))
+                    await client.send_stake_transaction(
+                        sender, recipient, amount_to_send, 0, str(+0))
+            else:
+                raise InternalErrorException(
+                    "Can't send transaction because {0} is locked".format(
+                        reward_account.address)
+                )
 
 
-async def run_client(host, port, private_key):
+async def run_client(host, port, private_key, pool_fee):
     async with NimiqClient(
         scheme="ws", host=host, port=port
     ) as client:
@@ -74,6 +76,7 @@ async def run_client(host, port, private_key):
         validator_address = await client.get_validator_address()
         validator = await client.get_validator_by_address(
             validator_address, include_stakers=False)
+        # Get reward account
         reward_account = await client.get_account_by_address(
             validator.rewardAddress)
         await client.unlock_account(reward_account.address)
@@ -84,7 +87,13 @@ async def run_client(host, port, private_key):
                     reward_account.address)
             )
         if consensus:
-            await client.head_subscribe(process_block)
+            # Subscribe to log of type payout rewards that contains the
+            # reward address
+            await client.subscribe_for_logs_by_addresses_and_types(
+                [validator.rewardAddress],
+                [LogType.PAYOUT_REWARD],
+                process_logs,
+                pool_fee=pool_fee)
             while True:
                 await asyncio.sleep(1)
 
@@ -143,12 +152,8 @@ def main():
     # Setup logging
     setup_logging(args)
 
-    # Setup the pool fee global variable
-    global pool_fee
-    pool_fee = args.pool_fee
-
     asyncio.get_event_loop().run_until_complete(
-        run_client(args.host, args.port, args.private_key)
+        run_client(args.host, args.port, args.private_key, args.pool_fee)
     )
 
 
