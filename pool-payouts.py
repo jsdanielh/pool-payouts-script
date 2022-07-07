@@ -47,7 +47,7 @@ async def process_logs(client, log, kwargs):
                     logging.info("Sending reward of {} to address {}".format(
                         amount_to_send, recipient))
                     await client.send_stake_transaction(
-                        sender, recipient, amount_to_send, 0, str(+0))
+                        sender, recipient, amount_to_send, 0, "+0")
             else:
                 raise InternalErrorException(
                     "Can't send transaction because {0} is locked".format(
