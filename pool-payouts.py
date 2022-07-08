@@ -46,8 +46,12 @@ async def process_logs(client, log, kwargs):
                 if sender != recipient:
                     logging.info("Sending reward of {} to address {}".format(
                         amount_to_send, recipient))
-                    await client.send_stake_transaction(
-                        sender, recipient, amount_to_send, 0, "+0")
+                    if kwargs['use_stake_txns']:
+                        await client.send_stake_transaction(
+                            sender, recipient, amount_to_send, 0, "+0")
+                    else:
+                        await client.send_basic_transaction(
+                            sender, recipient, amount_to_send, 0, "+0")
             else:
                 raise InternalErrorException(
                     "Can't send transaction because {0} is locked".format(
@@ -55,7 +59,7 @@ async def process_logs(client, log, kwargs):
                 )
 
 
-async def run_client(host, port, private_key, pool_fee):
+async def run_client(host, port, private_key, pool_fee, use_stake_txns):
     async with NimiqClient(
         scheme="ws", host=host, port=port
     ) as client:
@@ -93,7 +97,8 @@ async def run_client(host, port, private_key, pool_fee):
                 [validator.rewardAddress],
                 [LogType.PAYOUT_REWARD],
                 process_logs,
-                pool_fee=pool_fee)
+                pool_fee=pool_fee,
+                use_stake_txns=use_stake_txns)
             while True:
                 await asyncio.sleep(1)
 
@@ -119,7 +124,13 @@ def parse_args():
                         help="Private key of the validator reward account")
     parser.add_argument('-pf', "--pool-fee", type=float, required=True,
                         choices=[Range(0.0, 1.0)],
-                        help="Private key of the validator reward account")
+                        help=("Pool fee to apply when sending rewards to "
+                              "stakers. Value must be a float between 0 and "
+                              "1"))
+    parser.add_argument('-st', "--stake-transactions", action="store_true",
+                        help=("Set this to use staking transactions instead "
+                              "of regular (basic) transactions for paying "
+                              "rewards"))
     parser.add_argument("--verbose", "-v", dest="log_level",
                         action="append_const", const=-1)
     return parser.parse_args()
@@ -153,7 +164,8 @@ def main():
     setup_logging(args)
 
     asyncio.get_event_loop().run_until_complete(
-        run_client(args.host, args.port, args.private_key, args.pool_fee)
+        run_client(args.host, args.port, args.private_key,
+                   args.pool_fee, args.stake_transactions)
     )
 
 
