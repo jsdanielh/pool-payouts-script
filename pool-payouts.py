@@ -40,6 +40,9 @@ async def process_logs(client, log, kwargs):
             amount_to_send = int(
                 float(staker.balance)/float(total_staked_balance) *
                 float(inherent.value) * (1.0 - kwargs['pool_fee']))
+            # If we don't have anything to pay, skip this staker
+            if amount_to_send == 0:
+                continue
             sender = reward_account.address
             recipient = staker.address
             if await client.is_account_unlocked(reward_account.address):
