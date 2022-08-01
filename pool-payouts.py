@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import time
 from nimiqclient import *
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -72,6 +73,7 @@ async def run_client(host, port, private_key, pool_fee, use_stake_txns):
                 # Get consensus
                 consensus = await client.consensus()
                 logging.info("Consensus: {0}".format(consensus))
+                time.sleep(1)
         except InternalErrorException as error:
             logging.critical(
                 "Got error when trying to connect to the RPC server: {0}"
