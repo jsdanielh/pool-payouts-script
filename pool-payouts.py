@@ -4,8 +4,11 @@ import logging
 import time
 from nimiqclient import *
 
+from payments import Payments
+
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 DEFAULT_LOG_LEVEL = "INFO"
+PAYMENT_FREQ = 1 * 60
 
 
 class Range(object):
@@ -31,9 +34,9 @@ async def process_logs(client, log, kwargs):
         validator_address = await client.get_validator_address()
         validator = await client.get_validator_by_address(
             validator_address, include_stakers=True)
-        reward_account = await client.get_account_by_address(
-            validator.rewardAddress)
         total_staked_balance = 0
+        payments = kwargs['payments']
+        sender = kwargs['reward_address']
 
         for staker in validator.stakers:
             total_staked_balance += staker.balance
@@ -42,25 +45,12 @@ async def process_logs(client, log, kwargs):
                 float(staker.balance)/float(total_staked_balance) *
                 float(inherent.value) * (1.0 - kwargs['pool_fee']))
             # If we don't have anything to pay, skip this staker
-            if amount_to_send == 0:
+            if amount_to_send == 0 or sender == staker.address:
                 continue
-            sender = reward_account.address
-            recipient = staker.address
-            if await client.is_account_unlocked(reward_account.address):
-                if sender != recipient:
-                    logging.info("Sending reward of {} to address {}".format(
-                        amount_to_send, recipient))
-                    if kwargs['use_stake_txns']:
-                        await client.send_stake_transaction(
-                            sender, recipient, amount_to_send, 0, "+0")
-                    else:
-                        await client.send_basic_transaction(
-                            sender, recipient, amount_to_send, 0, "+0")
-            else:
-                raise InternalErrorException(
-                    "Can't send transaction because {0} is locked".format(
-                        reward_account.address)
-                )
+            logging.debug(
+                "Registering payment to '{}' for an amount of {}".format(
+                    staker.address, amount_to_send))
+            await payments.register_payment(staker.address, amount_to_send)
 
 
 async def run_client(host, port, private_key, pool_fee, use_stake_txns):
@@ -95,17 +85,22 @@ async def run_client(host, port, private_key, pool_fee, use_stake_txns):
                 "perhaps an incorrect private key was specified?".format(
                     reward_account.address)
             )
-        if consensus:
-            # Subscribe to log of type payout rewards that contains the
-            # reward address
-            await client.subscribe_for_logs_by_addresses_and_types(
-                [validator.rewardAddress],
-                [LogType.PAYOUT_REWARD],
-                process_logs,
-                pool_fee=pool_fee,
-                use_stake_txns=use_stake_txns)
-            while True:
-                await asyncio.sleep(1)
+
+        payments = Payments()
+
+        # Subscribe to log of type payout rewards that contains the
+        # reward address
+        await client.subscribe_for_logs_by_addresses_and_types(
+            [validator.rewardAddress],
+            [LogType.PAYOUT_REWARD],
+            process_logs,
+            pool_fee=pool_fee,
+            payments=payments,
+            reward_address=reward_account.address)
+        while True:
+            await asyncio.sleep(PAYMENT_FREQ)
+            await payments.process_payments(client, reward_account.address,
+                                            use_stake_txns)
 
 
 def parse_args():
