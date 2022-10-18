@@ -21,6 +21,8 @@ class Range(object):
 
 
 async def process_logs(client, log, kwargs):
+    block_number = log.metadata.blockNumber
+    log = log.data
     logging.debug("Received log of type: {}".format(log.type))
     if log.type != "applied-block":
         return
@@ -30,10 +32,10 @@ async def process_logs(client, log, kwargs):
         if inherent.type != "payout-reward":
             continue
 
-        logging.info("Running for block {}".format(log.blockNumber))
+        logging.info("Running for block {}".format(block_number))
         validator_address = await client.get_validator_address()
-        validator = await client.get_validator_by_address(
-            validator_address, include_stakers=True)
+        validator = (await client.get_validator_by_address(
+            validator_address, include_stakers=True)).data
         total_staked_balance = 0
         payments = kwargs['payments']
         sender = kwargs['reward_address']
@@ -73,11 +75,11 @@ async def run_client(host, port, private_key, pool_fee, use_stake_txns):
         await client.importRawKey(private_key)
         # Get the validator this is running for
         validator_address = await client.get_validator_address()
-        validator = await client.get_validator_by_address(
-            validator_address, include_stakers=False)
+        validator = (await client.get_validator_by_address(
+            validator_address, include_stakers=False)).data
         # Get reward account
-        reward_account = await client.get_account_by_address(
-            validator.rewardAddress)
+        reward_account = (await client.get_account_by_address(
+            validator.rewardAddress)).data
         await client.unlock_account(reward_account.address)
         if not await client.is_account_unlocked(reward_account.address):
             raise InternalErrorException(
