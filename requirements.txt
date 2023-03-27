@@ -1,2 +1,2 @@
 argparse
-git+https://github.com/jsdanielh/python-client.git@d28467f#egg=nimiqclient
+git+https://github.com/jsdanielh/python-client.git@fc0b651#egg=nimiqclient

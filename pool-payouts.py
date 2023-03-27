@@ -34,15 +34,15 @@ async def process_logs(client, log, kwargs):
 
         logging.info("Running for block {}".format(block_number))
         validator_address = await client.get_validator_address()
-        validator = (await client.get_validator_by_address(
-            validator_address, include_stakers=True)).data
+        stakers = (await client.get_stakers_by_validator_address(
+            validator_address)).data
         total_staked_balance = 0
         payments = kwargs['payments']
         sender = kwargs['reward_address']
 
-        for staker in validator.stakers:
+        for staker in stakers:
             total_staked_balance += staker.balance
-        for staker in validator.stakers:
+        for staker in stakers:
             amount_to_send = int(
                 float(staker.balance)/float(total_staked_balance) *
                 float(inherent.value) * (1.0 - kwargs['pool_fee']))
@@ -76,7 +76,7 @@ async def run_client(host, port, private_key, pool_fee, use_stake_txns):
         # Get the validator this is running for
         validator_address = await client.get_validator_address()
         validator = (await client.get_validator_by_address(
-            validator_address, include_stakers=False)).data
+            validator_address)).data
         # Get reward account
         reward_account = (await client.get_account_by_address(
             validator.rewardAddress)).data
