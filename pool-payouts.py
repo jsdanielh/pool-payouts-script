@@ -8,7 +8,7 @@ from payments import Payments
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 DEFAULT_LOG_LEVEL = "INFO"
-PAYMENT_FREQ = 1 * 60
+PAYMENT_FREQ = 60 * 60 # 1 hour
 
 
 class Range(object):
