@@ -8,8 +8,6 @@ from payments import Payments
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 DEFAULT_LOG_LEVEL = "INFO"
-PAYMENT_FREQ = 60 * 60 # 1 hour
-
 
 class Range(object):
     def __init__(self, start, end):
@@ -55,7 +53,8 @@ async def process_logs(client, log, kwargs):
             await payments.register_payment(staker.address, amount_to_send)
 
 
-async def run_client(host, port, private_key, pool_fee, use_stake_txns):
+async def run_client(host, port, private_key, pool_fee, use_stake_txns,
+                     frequency):
     async with NimiqClient(
         scheme="ws", host=host, port=port
     ) as client:
@@ -100,7 +99,7 @@ async def run_client(host, port, private_key, pool_fee, use_stake_txns):
             payments=payments,
             reward_address=reward_account.address)
         while True:
-            await asyncio.sleep(PAYMENT_FREQ)
+            await asyncio.sleep(frequency)
             await payments.process_payments(client, reward_account.address,
                                             use_stake_txns)
 
@@ -133,6 +132,8 @@ def parse_args():
                         help=("Set this to use staking transactions instead "
                               "of regular (basic) transactions for paying "
                               "rewards"))
+    parser.add_argument('-f', "--frequency", type=int, required=True,
+                        help="Payments frequency in seconds")
     parser.add_argument("--verbose", "-v", dest="log_level",
                         action="append_const", const=-1)
     return parser.parse_args()
@@ -167,7 +168,7 @@ def main():
 
     asyncio.get_event_loop().run_until_complete(
         run_client(args.host, args.port, args.private_key,
-                   args.pool_fee, args.stake_transactions)
+                   args.pool_fee, args.stake_transactions, args.frequency)
     )
 
 
