@@ -9,6 +9,7 @@ from payments import Payments
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 DEFAULT_LOG_LEVEL = "INFO"
 
+
 class Range(object):
     def __init__(self, start, end):
         self.start = start
@@ -132,8 +133,10 @@ def parse_args():
                         help=("Set this to use staking transactions instead "
                               "of regular (basic) transactions for paying "
                               "rewards"))
-    parser.add_argument('-f', "--frequency", type=int, required=True,
-                        help="Payments frequency in seconds")
+    parser.add_argument('-f', "--frequency", type=int, default=3600,
+                        help=("Optional payments frequency in seconds. If not "
+                              "specified it defaults to 3600 seconds (1 hour)"
+                              ))
     parser.add_argument("--verbose", "-v", dest="log_level",
                         action="append_const", const=-1)
     return parser.parse_args()
